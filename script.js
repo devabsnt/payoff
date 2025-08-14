@@ -218,7 +218,7 @@ async function fetchPriceAndData(id) {
 // Fetch historical data from CoinGecko to calculate average returns
 async function fetchHistoricalData(id) {
   try {
-    const days = currentPeriod === "max" ? 365 : parseInt(currentPeriod);
+    const days = parseInt(currentPeriod);
     
     // Get historical market chart data from CoinGecko - 1 API call
     const data = await fetchCryptoData(`coins/${id}/market_chart?vs_currency=usd&days=${days}`);
@@ -360,7 +360,7 @@ async function runSimulation() {
     }
     
     const projectedFinalPrice = pricePath[pricePath.length-1];
-    const periodLabels = {"30": "1 Month", "90": "3 Months", "365": "1 Year", "max": "All Time"};
+    const periodLabels = {"30": "1 Month", "90": "3 Months", "365": "1 Year"};
     const periodLabel = periodLabels[currentPeriod];
   
     document.getElementById("results").innerHTML = `
