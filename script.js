@@ -308,45 +308,32 @@ async function runSimulation() {
     if (![debt, apr, pay, p0].every(Number.isFinite))
       return alert("Fill all required fields");
   
-    // Calculate how many months to pay off debt with given payment
+    // Scenario: IGNORE debt payments entirely and DCA into crypto instead
     const monthlyRate = apr/12/100;
-    let tempDebt = debt;
-    let monthsToPayoff = 0;
-    const minPayment = debt * monthlyRate; // Minimum to cover interest
+    const SYM = selectedToken.symbol || "TOKENS";
     
-    if (pay <= minPayment) {
-      alert("Monthly payment must be higher than interest to pay off debt!");
-      return;
-    }
-    
-    // Calculate months to pay off
-    while (tempDebt > 0 && monthsToPayoff < 360) { // Max 30 years
-      tempDebt = tempDebt * (1 + monthlyRate) - pay;
-      monthsToPayoff++;
-    }
-    
-    const SYM         = selectedToken.symbol || "TOKENS";
-    const maxMonths   = monthsToPayoff;
-    const sigma       = sigmaDynamic;
+    // Fixed simulation period (user can choose how long to project)
+    const maxMonths = 48; // 4 years default - user can adjust this
     
     // Convert daily return to monthly compound return
     const monthlyGrowthRate = Math.pow(1 + avgDailyReturn, 30) - 1;
   
     let remainingDebt = debt;
     let totalInterest = 0;
-    let totalTokens   = 0;
+    let totalTokens = 0;
     const debtData = [], dcaData = [], pricePath = [];
   
-    for (let i=0; i<maxMonths; i++) {
-      remainingDebt *= 1 + monthlyRate;
-      totalInterest += (remainingDebt/(1+monthlyRate)) * monthlyRate;
+    for (let i = 0; i < maxMonths; i++) {
+      // Debt compounds monthly with NO PAYMENTS (ignored entirely)
+      remainingDebt *= (1 + monthlyRate);
+      totalInterest = remainingDebt - debt; // Total interest accrued
       debtData.push(remainingDebt);
   
-      // Use historical average return to project price
+      // Crypto price grows based on historical returns
       let price = p0 * Math.pow(1 + monthlyGrowthRate, i);
-      
       pricePath.push(price);
   
+      // DCA the monthly payment amount into crypto instead of paying debt
       totalTokens += pay / price;
       dcaData.push(totalTokens * price);
     }
@@ -377,25 +364,29 @@ async function runSimulation() {
     const periodLabel = periodLabels[currentPeriod];
   
     document.getElementById("results").innerHTML = `
-      <h2>Results</h2>
+      <h2>Results: Ignore Debt vs Stack Crypto</h2>
       <div class="summary-block">
-        <p><b>Debt:</b> Unpaid debt balloons to ~$${remainingDebt.toFixed(2)} after ${months} m.</p>
+        <p><b>Debt (ignored):</b> Balloons to $${remainingDebt.toFixed(2)} after ${months} months (${(((remainingDebt/debt - 1) * 100)).toFixed(1)}% increase)</p>
       </div>
       <div class="summary-block">
-        <p><b>DCA Stack:</b> ~${tokensNow.toFixed(4)} ${SYM} ≈ $${finalValue.toFixed(2)}</p>
+        <p><b>Crypto Stack:</b> ${tokensNow.toFixed(4)} ${SYM} worth $${finalValue.toFixed(2)}</p>
+      </div>
+      <div class="summary-block">
+        <p><b>Net Result:</b> ${profitIfSold >= 0 ? "✅ PROFIT" : "❌ LOSS"} of $${Math.abs(profitIfSold).toFixed(2)}</p>
+        <p><small>Crypto value minus debt = $${finalValue.toFixed(2)} - $${remainingDebt.toFixed(2)}</small></p>
       </div>
       <div class="summary-block">
         <p><b>Projection:</b> Based on ${periodLabel} historical avg return of ${(avgDailyReturn * 100).toFixed(3)}% daily</p>
         <p><b>${SYM} Price:</b> $${p0.toFixed(2)} → $${projectedFinalPrice.toFixed(2)} (${months} months)</p>
       </div>
-      <h3>Insights</h3>
+      <h3>Analysis</h3>
       <ul>
         ${crossover
-          ? `<li>Your ${SYM} stack overtakes debt at month <b>${crossover}</b>.</li>`
-          : `<li>Your ${SYM} stack never overtakes debt within ${months} m.</li>`}
-        <li>You burn ~$${totalInterest.toFixed(2)} in interest — enough for ~${tokensFromInterest.toFixed(4)} ${SYM} at today's price.</li>
-        <li>Average buy-in price: ~$${avgBuyPrice.toFixed(2)} per ${SYM}</li>
-        <li>If sold at month ${months}, you ${profitIfSold >= 0 ? "profit" : "lose"} ~$${Math.abs(profitIfSold).toFixed(2)}</li>
+          ? `<li>✅ Your ${SYM} stack overtakes debt value at month <b>${crossover}</b></li>`
+          : `<li>❌ Your ${SYM} stack never catches up to debt within ${months} months</li>`}
+        <li>💸 Interest accrued by ignoring debt: $${totalInterest.toFixed(2)}</li>
+        <li>📊 Average crypto buy price: $${avgBuyPrice.toFixed(2)} per ${SYM}</li>
+        <li>🎯 Strategy ${profitIfSold >= 0 ? "SUCCEEDS" : "FAILS"}: ${profitIfSold >= 0 ? "Crypto gains beat debt interest" : "Debt interest beats crypto gains"}</li>
         ${extraInsight}
       </ul>
     `;
