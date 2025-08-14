@@ -80,13 +80,27 @@ function copy(buttonEl) {
 async function fetchTopTokens() {
   try {
     const data = await fetchCryptoData('getCryptoList');
-    // FreeCryptoAPI returns an object with crypto currency data
-    const cryptoArray = Object.values(data).slice(0, 20);
-    topTokens = cryptoArray.map(t => ({ 
-      id: t.symbol.toLowerCase(), 
-      symbol: t.symbol,
-      name: t.name || t.symbol
-    }));
+    console.log('API response:', data);
+    
+    // Handle different response formats
+    let cryptoArray = [];
+    
+    if (Array.isArray(data)) {
+      cryptoArray = data.slice(0, 20);
+    } else if (typeof data === 'object' && data !== null) {
+      cryptoArray = Object.values(data).slice(0, 20);
+    }
+    
+    topTokens = cryptoArray
+      .filter(t => t && (t.symbol || t.name))
+      .map(t => ({ 
+        id: (t.symbol || t.name || 'unknown').toLowerCase(), 
+        symbol: t.symbol || t.name || 'UNKNOWN',
+        name: t.name || t.symbol || 'Unknown'
+      }))
+      .slice(0, 20);
+      
+    console.log('Processed tokens:', topTokens);
     renderTokenList("");
   } catch (err) {
     console.error("Failed to load top tokens", err);
@@ -171,19 +185,38 @@ async function fetchHistoricalData(id) {
     
     // FreeCryptoAPI historical data endpoint
     const data = await fetchCryptoData(`getHistory?symbol=${symbol}&days=${days}`);
+    console.log('Historical data response:', data);
     
-    if (!data || !Array.isArray(data) || data.length < 2) {
-      console.error("Insufficient historical data");
+    if (!data) {
+      console.error("No historical data received");
       return;
     }
     
-    // Extract prices from the response - assuming each item has a price field
-    const prices = data.map(item => {
-      return parseFloat(item.price || item.close || item.value || 0);
-    }).filter(price => price > 0);
+    let prices = [];
+    
+    // Handle different response formats
+    if (Array.isArray(data)) {
+      prices = data.map(item => {
+        return parseFloat(item.price || item.close || item.value || item[1] || 0);
+      }).filter(price => price > 0);
+    } else if (typeof data === 'object' && data.prices) {
+      prices = data.prices.map(price => parseFloat(price)).filter(price => price > 0);
+    } else if (typeof data === 'object') {
+      // Try to extract any numeric values
+      const values = Object.values(data);
+      prices = values.filter(v => typeof v === 'number' || !isNaN(parseFloat(v)))
+                    .map(v => parseFloat(v))
+                    .filter(price => price > 0);
+    }
+    
+    console.log('Extracted prices:', prices);
     
     if (prices.length < 2) {
-      console.error("No valid price data found");
+      console.error("No valid price data found, using fallback");
+      // Fallback to conservative estimates
+      avgDailyReturn = 0.002;
+      sigmaDynamic = 0.06;
+      updateHistoricalStats();
       return;
     }
     
