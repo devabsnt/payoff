@@ -180,24 +180,84 @@ async function fetchPriceAndData(id) {
   }
 }
 
-// Skip historical data - just use simple linear extrapolation
+// Fetch historical data from CMC to calculate average returns
 async function fetchHistoricalData(id) {
   try {
-    // CMC historical data requires paid subscription
-    // We'll just use linear price extrapolation in the simulation
-    console.log('Skipping historical data - using linear price extrapolation');
+    const days = currentPeriod === "max" ? 365 : parseInt(currentPeriod);
     
-    // Set minimal values so the simulation works without historical calculations
-    avgDailyReturn = 0;
-    sigmaDynamic = 0;
+    // Calculate start and end dates
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
     
-    // Don't show historical stats since we're not using them
-    document.getElementById("historicalStats").style.display = "none";
+    const startISO = start.toISOString();
+    const endISO = end.toISOString();
+    
+    // Try CMC historical quotes endpoint
+    const endpoint = `cryptocurrency/quotes/historical?id=${id}&time_start=${startISO}&time_end=${endISO}&interval=daily`;
+    console.log('Fetching historical data:', endpoint);
+    
+    const data = await fetchCryptoData(endpoint);
+    console.log('Historical data response:', data);
+    
+    if (data && data.status && data.status.error_code === 0 && data.data && data.data.quotes) {
+      const quotes = data.data.quotes;
+      const prices = quotes.map(quote => quote.quote.USD.price);
+      
+      console.log('Extracted prices:', prices);
+      
+      if (prices.length >= 2) {
+        // Calculate average daily return from historical prices
+        processHistoricalData(prices);
+        return;
+      }
+    }
+    
+    console.warn('CMC historical data failed or requires paid plan, using fallback');
+    // Fallback: use recent price changes as proxy
+    await fetchRecentPriceChanges(id);
     
   } catch (err) {
     console.error("Historical data fetch failed", err);
-    avgDailyReturn = 0;
-    sigmaDynamic = 0;
+    await fetchRecentPriceChanges(id);
+  }
+}
+
+// Fallback: use recent price change percentages as proxy for returns
+async function fetchRecentPriceChanges(id) {
+  try {
+    const data = await fetchCryptoData(`cryptocurrency/quotes/latest?id=${id}`);
+    
+    if (data && data.status && data.status.error_code === 0 && data.data && data.data[id]) {
+      const crypto = data.data[id];
+      const quote = crypto.quote.USD;
+      
+      // Use price change percentages as proxy for returns
+      let dailyChange = 0;
+      
+      if (currentPeriod === "30") {
+        dailyChange = (quote.percent_change_30d || 0) / 30; // 30 day average
+      } else if (currentPeriod === "90") {
+        // Estimate 90 day from 30d and 7d data
+        const change30d = quote.percent_change_30d || 0;
+        const change7d = quote.percent_change_7d || 0;
+        dailyChange = (change30d * 3 + change7d * 4.28) / (90); // Weighted estimate
+      } else {
+        dailyChange = (quote.percent_change_7d || 0) / 7; // 7 day average
+      }
+      
+      avgDailyReturn = dailyChange / 100; // Convert percentage to decimal
+      sigmaDynamic = 0.05; // Minimal volatility since we're just extrapolating
+      
+      updateHistoricalStats();
+      console.log(`Using price change proxy: ${dailyChange.toFixed(3)}% daily return`);
+    }
+  } catch (err) {
+    console.error("Fallback price change fetch failed", err);
+    // Ultimate fallback
+    avgDailyReturn = 0.001; // 0.1% daily
+    sigmaDynamic = 0.05;
+    updateHistoricalStats();
   }
 }
 
