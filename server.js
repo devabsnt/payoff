@@ -6,8 +6,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // API key MUST be set as environment variable - no fallbacks
-const API_KEY = process.env.FREECRYPTO_API_KEY;
-const BASE_URL = 'https://api.freecryptoapi.com/v1';
+const API_KEY = process.env.CMC_API_KEY;
+const BASE_URL = 'https://pro-api.coinmarketcap.com/v1';
 
 // Enable CORS
 app.use(cors());
@@ -25,20 +25,24 @@ app.get('/api/proxy', async (req, res) => {
   }
   
   if (!API_KEY) {
-    console.error('FREECRYPTO_API_KEY environment variable not set');
-    return res.status(500).json({ error: 'API key not configured. Set FREECRYPTO_API_KEY environment variable.' });
+    console.error('CMC_API_KEY environment variable not set');
+    return res.status(500).json({ error: 'API key not configured. Set CMC_API_KEY environment variable.' });
   }
 
   try {
-    // Add API key properly - use & if endpoint already has query params
-    const separator = endpoint.includes('?') ? '&' : '?';
-    const url = `${BASE_URL}/${endpoint}${separator}apikey=${API_KEY}`;
+    // CoinMarketCap uses headers for API key, not query params
+    const url = `${BASE_URL}/${endpoint}`;
     console.log('Full URL being requested:', url);
     console.log('Endpoint received:', endpoint);
     console.log('API key length:', API_KEY ? API_KEY.length : 'undefined');
     
     const fetch = (await import('node-fetch')).default;
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'X-CMC_PRO_API_KEY': API_KEY,
+        'Accept': 'application/json'
+      }
+    });
     
     console.log('Response status:', response.status);
     console.log('Response headers:', Object.fromEntries(response.headers));

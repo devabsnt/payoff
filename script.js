@@ -10,7 +10,7 @@ const tokenSearch = document.getElementById("tokenSearch");
 const tokenList   = document.getElementById("tokenList");
 let currentPeriod = "90"; // Default to 3 months
 
-// Helper function for FreeCryptoAPI calls via proxy
+// Helper function for CoinMarketCap API calls via proxy
 async function fetchCryptoData(endpoint) {
   // Use local proxy for development, your domain for production
   const proxyUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
@@ -24,7 +24,7 @@ async function fetchCryptoData(endpoint) {
     }
     return await response.json();
   } catch (error) {
-    console.error('FreeCryptoAPI error:', error);
+    console.error('CoinMarketCap API error:', error);
     throw error;
   }
 }
@@ -76,57 +76,41 @@ function copy(buttonEl) {
     }, 1000);
 }
 
-// Fetch top tokens from FreeCryptoAPI
+// Fetch top tokens from CoinMarketCap
 async function fetchTopTokens() {
   try {
-    // Test with conversion endpoint first (has clear required params)
-    console.log('Testing API with conversion endpoint...');
-    const testData = await fetchCryptoData(`getConversion?from=BTC&to=USD&amount=1`);
-    console.log('Conversion API test:', testData);
+    // CoinMarketCap endpoint for top cryptocurrencies
+    const data = await fetchCryptoData('cryptocurrency/listings/latest?limit=20');
+    console.log('CMC API response:', data);
     
-    if (testData && !testData.error) {
-      console.log('API is working! Now testing getData...');
-      
-      // Try getData with BTC
-      const data = await fetchCryptoData(`getData?symbol=BTC`);
-      console.log('getData response:', data);
-      
-      if (data && typeof data === 'object' && !data.error) {
-        // Use fallback tokens but getData should work for prices
-        topTokens = [
-          { id: "btc", symbol: "BTC", name: "Bitcoin" },
-          { id: "eth", symbol: "ETH", name: "Ethereum" },
-          { id: "usdt", symbol: "USDT", name: "Tether" },
-          { id: "bnb", symbol: "BNB", name: "BNB" },
-          { id: "sol", symbol: "SOL", name: "Solana" },
-          { id: "ada", symbol: "ADA", name: "Cardano" },
-          { id: "xrp", symbol: "XRP", name: "Ripple" },
-          { id: "doge", symbol: "DOGE", name: "Dogecoin" },
-          { id: "avax", symbol: "AVAX", name: "Avalanche" },
-          { id: "dot", symbol: "DOT", name: "Polkadot" }
-        ];
-        console.log('Using fallback tokens, but API should work for prices');
-        renderTokenList("");
-        return;
-      }
+    if (data && data.status && data.status.error_code === 0 && data.data) {
+      topTokens = data.data.map(crypto => ({
+        id: crypto.id,
+        symbol: crypto.symbol,
+        name: crypto.name,
+        price: crypto.quote.USD.price
+      }));
+      console.log('Processed tokens:', topTokens);
+      renderTokenList("");
+      return;
     }
     
-    throw new Error('API test failed: ' + (testData?.error || 'Unknown error'));
+    throw new Error(data?.status?.error_message || 'Invalid API response');
     
   } catch (err) {
-    console.error("API tests failed", err);
-    // Always use fallback tokens
+    console.error("Failed to load top tokens", err);
+    // Fallback to common tokens
     topTokens = [
-      { id: "btc", symbol: "BTC", name: "Bitcoin" },
-      { id: "eth", symbol: "ETH", name: "Ethereum" },
-      { id: "usdt", symbol: "USDT", name: "Tether" },
-      { id: "bnb", symbol: "BNB", name: "BNB" },
-      { id: "sol", symbol: "SOL", name: "Solana" },
-      { id: "ada", symbol: "ADA", name: "Cardano" },
-      { id: "xrp", symbol: "XRP", name: "Ripple" },
-      { id: "doge", symbol: "DOGE", name: "Dogecoin" },
-      { id: "avax", symbol: "AVAX", name: "Avalanche" },
-      { id: "dot", symbol: "DOT", name: "Polkadot" }
+      { id: 1, symbol: "BTC", name: "Bitcoin" },
+      { id: 1027, symbol: "ETH", name: "Ethereum" },
+      { id: 825, symbol: "USDT", name: "Tether" },
+      { id: 1839, symbol: "BNB", name: "BNB" },
+      { id: 5426, symbol: "SOL", name: "Solana" },
+      { id: 2010, symbol: "ADA", name: "Cardano" },
+      { id: 52, symbol: "XRP", name: "Ripple" },
+      { id: 74, symbol: "DOGE", name: "Dogecoin" },
+      { id: 5805, symbol: "AVAX", name: "Avalanche" },
+      { id: 6636, symbol: "DOT", name: "Polkadot" }
     ];
     renderTokenList("");
   }
@@ -157,13 +141,16 @@ function selectToken(id, symbol) {
 
 async function lookupToken(q) {
   try {
-    // Try to get data for the searched symbol directly
-    const data = await fetchCryptoData(`getData?symbol=${encodeURIComponent(q.toUpperCase())}`);
+    // Search for cryptocurrency by symbol using CMC API
+    const data = await fetchCryptoData(`cryptocurrency/quotes/latest?symbol=${encodeURIComponent(q.toUpperCase())}`);
     
-    if (data && data[q.toUpperCase()]) {
+    if (data && data.status && data.status.error_code === 0 && data.data) {
       const symbol = q.toUpperCase();
-      setSelectedToken(symbol.toLowerCase(), symbol);
-      fetchPriceAndData(symbol.toLowerCase());
+      const cryptoData = data.data[symbol];
+      if (cryptoData) {
+        setSelectedToken(cryptoData.id, symbol);
+        fetchPriceAndData(cryptoData.id);
+      }
     }
   } catch (err) {
     console.warn("Token lookup failed", err);
@@ -182,66 +169,52 @@ function setStartPrice(v) {
 
 async function fetchPriceAndData(id) {
   try {
-    // Get current price from FreeCryptoAPI using symbol
-    const symbol = id.toUpperCase();
-    const data = await fetchCryptoData(`getData?symbol=${symbol}`);
-    if (data && data[symbol] && data[symbol].price) {
-      setStartPrice(parseFloat(data[symbol].price));
+    // Get current price from CoinMarketCap using ID
+    const data = await fetchCryptoData(`cryptocurrency/quotes/latest?id=${id}`);
+    if (data && data.status && data.status.error_code === 0 && data.data && data.data[id]) {
+      const price = data.data[id].quote.USD.price;
+      setStartPrice(parseFloat(price));
     }
   } catch (err) {
     console.error("Failed to fetch price", err);
   }
 }
 
-// Fetch historical data using FreeCryptoAPI
+// Fetch historical data using CoinMarketCap (requires paid plan)
 async function fetchHistoricalData(id) {
   try {
-    const days = currentPeriod === "max" ? 365 : parseInt(currentPeriod);
-    const symbol = id.toUpperCase();
+    // CMC historical data requires paid subscription
+    // For free tier, we'll use reasonable volatility estimates
+    console.log('Using volatility estimates - CMC historical data requires paid plan');
     
-    // FreeCryptoAPI historical data endpoint
-    const data = await fetchCryptoData(`getHistory?symbol=${symbol}&days=${days}`);
-    console.log('Historical data response:', data);
+    // Get current price to understand the asset better
+    const priceData = await fetchCryptoData(`cryptocurrency/quotes/latest?id=${id}`);
     
-    if (!data) {
-      console.error("No historical data received");
-      return;
+    let volatilityMultiplier = 1;
+    if (priceData && priceData.status && priceData.status.error_code === 0) {
+      const crypto = priceData.data[id];
+      const marketCap = crypto?.quote?.USD?.market_cap || 0;
+      
+      // Adjust volatility based on market cap
+      if (marketCap > 100000000000) { // > $100B
+        volatilityMultiplier = 0.7; // Lower volatility for large caps
+      } else if (marketCap > 10000000000) { // > $10B  
+        volatilityMultiplier = 1.0; // Medium volatility
+      } else {
+        volatilityMultiplier = 1.5; // Higher volatility for small caps
+      }
     }
     
-    let prices = [];
+    // Base estimates adjusted by market cap
+    avgDailyReturn = 0.003 * volatilityMultiplier;
+    sigmaDynamic = 0.06 * volatilityMultiplier;
     
-    // Handle different response formats
-    if (Array.isArray(data)) {
-      prices = data.map(item => {
-        return parseFloat(item.price || item.close || item.value || item[1] || 0);
-      }).filter(price => price > 0);
-    } else if (typeof data === 'object' && data.prices) {
-      prices = data.prices.map(price => parseFloat(price)).filter(price => price > 0);
-    } else if (typeof data === 'object') {
-      // Try to extract any numeric values
-      const values = Object.values(data);
-      prices = values.filter(v => typeof v === 'number' || !isNaN(parseFloat(v)))
-                    .map(v => parseFloat(v))
-                    .filter(price => price > 0);
-    }
-    
-    console.log('Extracted prices:', prices);
-    
-    if (prices.length < 2) {
-      console.error("No valid price data found, using fallback");
-      // Fallback to conservative estimates
-      avgDailyReturn = 0.002;
-      sigmaDynamic = 0.06;
-      updateHistoricalStats();
-      return;
-    }
-    
-    // Process the data
-    processHistoricalData(prices);
+    updateHistoricalStats();
+    console.log(`Using volatility estimates: ${(avgDailyReturn * 100).toFixed(3)}% daily return, ${(sigmaDynamic * 100).toFixed(1)}% volatility`);
     
   } catch (err) {
     console.error("Historical data fetch failed", err);
-    // Fallback to conservative estimates if API fails
+    // Fallback to conservative estimates
     avgDailyReturn = 0.002;
     sigmaDynamic = 0.06;
     updateHistoricalStats();
