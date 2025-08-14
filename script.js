@@ -79,22 +79,24 @@ function copy(buttonEl) {
 // Fetch top tokens from FreeCryptoAPI
 async function fetchTopTokens() {
   try {
-    const data = await fetchCryptoData('coins');
-    topTokens = data.slice(0, 20).map(t => ({ 
-      id: t.id, 
-      symbol: t.symbol.toUpperCase(),
-      name: t.name
+    const data = await fetchCryptoData('getCryptoList');
+    // FreeCryptoAPI returns an object with crypto currency data
+    const cryptoArray = Object.values(data).slice(0, 20);
+    topTokens = cryptoArray.map(t => ({ 
+      id: t.symbol.toLowerCase(), 
+      symbol: t.symbol,
+      name: t.name || t.symbol
     }));
     renderTokenList("");
   } catch (err) {
     console.error("Failed to load top tokens", err);
     // Fallback to common tokens
     topTokens = [
-      { id: "bitcoin", symbol: "BTC", name: "Bitcoin" },
-      { id: "ethereum", symbol: "ETH", name: "Ethereum" },
-      { id: "tether", symbol: "USDT", name: "Tether" },
-      { id: "binancecoin", symbol: "BNB", name: "BNB" },
-      { id: "solana", symbol: "SOL", name: "Solana" }
+      { id: "btc", symbol: "BTC", name: "Bitcoin" },
+      { id: "eth", symbol: "ETH", name: "Ethereum" },
+      { id: "usdt", symbol: "USDT", name: "Tether" },
+      { id: "bnb", symbol: "BNB", name: "BNB" },
+      { id: "sol", symbol: "SOL", name: "Solana" }
     ];
     renderTokenList("");
   }
@@ -125,13 +127,13 @@ function selectToken(id, symbol) {
 
 async function lookupToken(q) {
   try {
-    // Search on FreeCryptoAPI
-    const data = await fetchCryptoData(`coins?search=${encodeURIComponent(q)}`);
+    // Try to get data for the searched symbol directly
+    const data = await fetchCryptoData(`getData?symbol=${encodeURIComponent(q.toUpperCase())}`);
     
-    if (data && data.length > 0) {
-      const token = data[0];
-      setSelectedToken(token.id, token.symbol.toUpperCase());
-      fetchPriceAndData(token.id);
+    if (data && data[q.toUpperCase()]) {
+      const symbol = q.toUpperCase();
+      setSelectedToken(symbol.toLowerCase(), symbol);
+      fetchPriceAndData(symbol.toLowerCase());
     }
   } catch (err) {
     console.warn("Token lookup failed", err);
@@ -150,10 +152,11 @@ function setStartPrice(v) {
 
 async function fetchPriceAndData(id) {
   try {
-    // Get current price from FreeCryptoAPI
-    const data = await fetchCryptoData(`coins/${id}`);
-    if (data && data.current_price) {
-      setStartPrice(parseFloat(data.current_price));
+    // Get current price from FreeCryptoAPI using symbol
+    const symbol = id.toUpperCase();
+    const data = await fetchCryptoData(`getData?symbol=${symbol}`);
+    if (data && data[symbol] && data[symbol].price) {
+      setStartPrice(parseFloat(data[symbol].price));
     }
   } catch (err) {
     console.error("Failed to fetch price", err);
@@ -164,20 +167,25 @@ async function fetchPriceAndData(id) {
 async function fetchHistoricalData(id) {
   try {
     const days = currentPeriod === "max" ? 365 : parseInt(currentPeriod);
+    const symbol = id.toUpperCase();
     
     // FreeCryptoAPI historical data endpoint
-    const data = await fetchCryptoData(`coins/${id}/history?days=${days}`);
+    const data = await fetchCryptoData(`getHistory?symbol=${symbol}&days=${days}`);
     
-    if (!data || !data.prices || data.prices.length < 2) {
+    if (!data || !Array.isArray(data) || data.length < 2) {
       console.error("Insufficient historical data");
       return;
     }
     
-    // Extract prices from the response
-    const prices = data.prices.map(pricePoint => {
-      // Handle different possible formats
-      return Array.isArray(pricePoint) ? pricePoint[1] : pricePoint.price || pricePoint;
-    });
+    // Extract prices from the response - assuming each item has a price field
+    const prices = data.map(item => {
+      return parseFloat(item.price || item.close || item.value || 0);
+    }).filter(price => price > 0);
+    
+    if (prices.length < 2) {
+      console.error("No valid price data found");
+      return;
+    }
     
     // Process the data
     processHistoricalData(prices);

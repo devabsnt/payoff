@@ -31,9 +31,25 @@ app.get('/api/proxy', async (req, res) => {
 
   try {
     const url = `${BASE_URL}/${endpoint}?apikey=${API_KEY}`;
+    console.log('Requesting URL:', url);
     
     const fetch = (await import('node-fetch')).default;
     const response = await fetch(url);
+    
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers));
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.log('Non-JSON response:', text.substring(0, 500));
+      return res.status(500).json({ 
+        error: 'API returned non-JSON response', 
+        contentType,
+        preview: text.substring(0, 200)
+      });
+    }
+    
     const data = await response.json();
     
     if (!response.ok) {
@@ -43,7 +59,7 @@ app.get('/api/proxy', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error('Proxy error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

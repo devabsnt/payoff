@@ -1,0 +1,212 @@
+FreeCryptoAPI
+ 1.0.0 
+OAS 3.0
+fca.yaml
+REST API documentation for FreeCryptoAPI.com
+
+FreeCryptoAPI Support - Website
+Servers
+
+https://api.freecryptoapi.com/v1
+Market Data
+
+
+GET
+/getCryptoList
+Get list of supported crypto currencies and pairs
+
+
+Parameters
+No parameters
+
+Responses
+Code	Description	Links
+200	
+Success
+
+No links
+
+GET
+/getData
+Get single or multiple crypto currency data
+
+
+Parameters
+Name	Description
+symbol *
+string
+(query)
+Symbols separated by + (e.g., BTC+ETH+ETHBTC@binance)
+
+symbol
+Responses
+Code	Description	Links
+200	
+Success
+
+No links
+
+GET
+/getDataCurrency
+Get data in local currency
+
+
+Parameters
+Name	Description
+symbol *
+string
+(query)
+Crypto currencies separated by + (e.g., BTC+ETH)
+
+symbol
+local *
+string
+(query)
+3-letter local currency code (e.g., EUR, GBP, TRL)
+
+local
+Responses
+Code	Description	Links
+200	
+Success
+
+No links
+
+GET
+/getPerformance
+Get performance change percentages for a symbol (1d, 7d, 15d, 30d, 90d, 180d, 270d, 365d, 720d)
+
+
+Parameters
+Name	Description
+symbol *
+string
+(query)
+symbol
+Responses
+Code	Description	Links
+200	
+Success
+
+No links
+
+GET
+/getTechnicalAnalysis
+Get technical analysis (MACD, signal line, RSI) for a symbol
+
+
+Parameters
+Name	Description
+symbol *
+string
+(query)
+symbol
+Responses
+Code	Description	Links
+200	
+Success
+
+No links
+Exchange Data
+
+
+GET
+/getExchange
+Get all pairs and their latest data on a specific exchange
+
+
+Parameters
+Name	Description
+exchange *
+string
+(query)
+Supported entries binance, mexc, kucoin, gate, huobi, bybit, bitget
+
+exchange
+Responses
+Code	Description	Links
+200	
+Success
+
+No links
+Conversion
+
+
+GET
+/getConversion
+Convert between any 2 crypto currencies
+
+
+Parameters
+Name	Description
+from *
+string
+(query)
+from
+to *
+string
+(query)
+to
+amount *
+number
+(query)
+amount
+Responses
+Code	Description	Links
+200	
+Success
+
+No links
+Historical Data
+
+
+GET
+/getHistory
+Get last X days of historical data
+
+
+Parameters
+Name	Description
+symbol *
+string
+(query)
+symbol
+days *
+integer
+(query)
+days
+Responses
+Code	Description	Links
+200	
+Success
+
+No links
+
+GET
+/getTimeframe
+Get historical data within date range
+
+
+Parameters
+Name	Description
+symbol *
+string
+(query)
+symbol
+start *
+string($date)
+(query)
+Start date (format yyyy-mm-dd)
+
+start
+end *
+string($date)
+(query)
+End date (format yyyy-mm-dd)
+
+end
+Responses
+Code	Description	Links
+200	
+Success
+
