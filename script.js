@@ -79,27 +79,34 @@ function copy(buttonEl) {
 // Fetch top tokens from FreeCryptoAPI
 async function fetchTopTokens() {
   try {
-    // Since getCryptoList needs parameters, let's get data for common tokens instead
-    const commonSymbols = "BTC+ETH+USDT+BNB+SOL+ADA+XRP+DOGE+AVAX+DOT+MATIC+LTC+LINK+UNI+BCH+XLM+ALGO+VET+TRX+FIL";
-    const data = await fetchCryptoData(`getData?symbol=${commonSymbols}`);
-    console.log('API response:', data);
+    // Test with just BTC first to see if the API works
+    const data = await fetchCryptoData(`getData?symbol=BTC`);
+    console.log('API response for BTC:', data);
     
-    if (data && typeof data === 'object' && !data.error) {
-      topTokens = Object.keys(data).map(symbol => ({
-        id: symbol.toLowerCase(),
-        symbol: symbol,
-        name: symbol // We don't have names from this endpoint
-      }));
-      console.log('Processed tokens:', topTokens);
-      renderTokenList("");
-      return;
+    if (data && typeof data === 'object' && !data.error && data.BTC) {
+      // If BTC works, try multiple symbols
+      const commonSymbols = "BTC+ETH+USDT+BNB+SOL+ADA+XRP+DOGE+AVAX+DOT";
+      const multiData = await fetchCryptoData(`getData?symbol=${commonSymbols}`);
+      console.log('API response for multiple symbols:', multiData);
+      
+      if (multiData && typeof multiData === 'object' && !multiData.error) {
+        topTokens = Object.keys(multiData).map(symbol => ({
+          id: symbol.toLowerCase(),
+          symbol: symbol,
+          name: symbol
+        }));
+        console.log('Processed tokens:', topTokens);
+        renderTokenList("");
+        return;
+      }
     }
     
-    throw new Error(data?.error || 'Invalid API response');
+    // If API calls fail, show error details
+    throw new Error(data?.error || 'API failed or returned invalid data');
     
   } catch (err) {
     console.error("Failed to load top tokens", err);
-    // Fallback to common tokens
+    // Always use fallback tokens
     topTokens = [
       { id: "btc", symbol: "BTC", name: "Bitcoin" },
       { id: "eth", symbol: "ETH", name: "Ethereum" },
