@@ -79,29 +79,24 @@ function copy(buttonEl) {
 // Fetch top tokens from FreeCryptoAPI
 async function fetchTopTokens() {
   try {
-    const data = await fetchCryptoData('getCryptoList');
+    // Since getCryptoList needs parameters, let's get data for common tokens instead
+    const commonSymbols = "BTC+ETH+USDT+BNB+SOL+ADA+XRP+DOGE+AVAX+DOT+MATIC+LTC+LINK+UNI+BCH+XLM+ALGO+VET+TRX+FIL";
+    const data = await fetchCryptoData(`getData?symbol=${commonSymbols}`);
     console.log('API response:', data);
     
-    // Handle different response formats
-    let cryptoArray = [];
-    
-    if (Array.isArray(data)) {
-      cryptoArray = data.slice(0, 20);
-    } else if (typeof data === 'object' && data !== null) {
-      cryptoArray = Object.values(data).slice(0, 20);
+    if (data && typeof data === 'object' && !data.error) {
+      topTokens = Object.keys(data).map(symbol => ({
+        id: symbol.toLowerCase(),
+        symbol: symbol,
+        name: symbol // We don't have names from this endpoint
+      }));
+      console.log('Processed tokens:', topTokens);
+      renderTokenList("");
+      return;
     }
     
-    topTokens = cryptoArray
-      .filter(t => t && (t.symbol || t.name))
-      .map(t => ({ 
-        id: (t.symbol || t.name || 'unknown').toLowerCase(), 
-        symbol: t.symbol || t.name || 'UNKNOWN',
-        name: t.name || t.symbol || 'Unknown'
-      }))
-      .slice(0, 20);
-      
-    console.log('Processed tokens:', topTokens);
-    renderTokenList("");
+    throw new Error(data?.error || 'Invalid API response');
+    
   } catch (err) {
     console.error("Failed to load top tokens", err);
     // Fallback to common tokens
@@ -110,7 +105,12 @@ async function fetchTopTokens() {
       { id: "eth", symbol: "ETH", name: "Ethereum" },
       { id: "usdt", symbol: "USDT", name: "Tether" },
       { id: "bnb", symbol: "BNB", name: "BNB" },
-      { id: "sol", symbol: "SOL", name: "Solana" }
+      { id: "sol", symbol: "SOL", name: "Solana" },
+      { id: "ada", symbol: "ADA", name: "Cardano" },
+      { id: "xrp", symbol: "XRP", name: "Ripple" },
+      { id: "doge", symbol: "DOGE", name: "Dogecoin" },
+      { id: "avax", symbol: "AVAX", name: "Avalanche" },
+      { id: "dot", symbol: "DOT", name: "Polkadot" }
     ];
     renderTokenList("");
   }
