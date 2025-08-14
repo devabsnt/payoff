@@ -5,9 +5,9 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// API key MUST be set as environment variable - no fallbacks
+// API key MUST be set as environment variable - no fallbacks  
 const API_KEY = process.env.COINGECKO_API_KEY;
-const BASE_URL = 'https://pro-api.coingecko.com/api/v3';
+const BASE_URL = 'https://api.coingecko.com/api/v3';
 
 // Enable CORS
 app.use(cors());
@@ -30,15 +30,19 @@ app.get('/api/proxy', async (req, res) => {
   }
 
   try {
-    // CoinGecko uses API key as query parameter
-    const separator = endpoint.includes('?') ? '&' : '?';
-    const url = `${BASE_URL}/${endpoint}${separator}x_cg_demo_api_key=${API_KEY}`;
+    // CoinGecko Demo API uses header authentication
+    const url = `${BASE_URL}/${endpoint}`;
     console.log('Full URL being requested:', url);
     console.log('Endpoint received:', endpoint);
     console.log('API key length:', API_KEY ? API_KEY.length : 'undefined');
     
     const fetch = (await import('node-fetch')).default;
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'x-cg-demo-api-key': API_KEY,
+        'Accept': 'application/json'
+      }
+    });
     
     console.log('Response status:', response.status);
     console.log('Response headers:', Object.fromEntries(response.headers));
