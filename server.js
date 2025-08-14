@@ -30,7 +30,9 @@ app.get('/api/proxy', async (req, res) => {
   }
 
   try {
-    const url = `${BASE_URL}/${endpoint}?apikey=${API_KEY}`;
+    // Add API key properly - use & if endpoint already has query params
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const url = `${BASE_URL}/${endpoint}${separator}apikey=${API_KEY}`;
     console.log('Requesting URL:', url);
     
     const fetch = (await import('node-fetch')).default;
