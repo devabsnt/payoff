@@ -10,7 +10,7 @@ const tokenSearch = document.getElementById("tokenSearch");
 const tokenList   = document.getElementById("tokenList");
 let currentPeriod = "90"; // Default to 3 months
 
-// Helper function for CoinMarketCap API calls via proxy
+// Helper function for CoinGecko API calls via proxy
 async function fetchCryptoData(endpoint) {
   // Use local proxy for development, your domain for production
   const proxyUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
@@ -24,7 +24,7 @@ async function fetchCryptoData(endpoint) {
     }
     return await response.json();
   } catch (error) {
-    console.error('CoinMarketCap API error:', error);
+    console.error('CoinGecko API error:', error);
     throw error;
   }
 }
@@ -76,41 +76,41 @@ function copy(buttonEl) {
     }, 1000);
 }
 
-// Fetch top tokens from CoinMarketCap
+// Fetch top tokens from CoinGecko - efficient to stay under 30 req/min
 async function fetchTopTokens() {
   try {
-    // CoinMarketCap endpoint for top cryptocurrencies
-    const data = await fetchCryptoData('cryptocurrency/listings/latest?limit=20');
-    console.log('CMC API response:', data);
+    // Get top 20 coins by market cap - 1 API call
+    const data = await fetchCryptoData('coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=1h%2C24h%2C7d%2C30d');
+    console.log('CoinGecko API response:', data);
     
-    if (data && data.status && data.status.error_code === 0 && data.data) {
-      topTokens = data.data.map(crypto => ({
+    if (Array.isArray(data)) {
+      topTokens = data.map(crypto => ({
         id: crypto.id,
-        symbol: crypto.symbol,
+        symbol: crypto.symbol.toUpperCase(),
         name: crypto.name,
-        price: crypto.quote.USD.price
+        price: crypto.current_price
       }));
       console.log('Processed tokens:', topTokens);
       renderTokenList("");
       return;
     }
     
-    throw new Error(data?.status?.error_message || 'Invalid API response');
+    throw new Error('Invalid API response format');
     
   } catch (err) {
     console.error("Failed to load top tokens", err);
     // Fallback to common tokens
     topTokens = [
-      { id: 1, symbol: "BTC", name: "Bitcoin" },
-      { id: 1027, symbol: "ETH", name: "Ethereum" },
-      { id: 825, symbol: "USDT", name: "Tether" },
-      { id: 1839, symbol: "BNB", name: "BNB" },
-      { id: 5426, symbol: "SOL", name: "Solana" },
-      { id: 2010, symbol: "ADA", name: "Cardano" },
-      { id: 52, symbol: "XRP", name: "Ripple" },
-      { id: 74, symbol: "DOGE", name: "Dogecoin" },
-      { id: 5805, symbol: "AVAX", name: "Avalanche" },
-      { id: 6636, symbol: "DOT", name: "Polkadot" }
+      { id: "bitcoin", symbol: "BTC", name: "Bitcoin" },
+      { id: "ethereum", symbol: "ETH", name: "Ethereum" },
+      { id: "tether", symbol: "USDT", name: "Tether" },
+      { id: "binancecoin", symbol: "BNB", name: "BNB" },
+      { id: "solana", symbol: "SOL", name: "Solana" },
+      { id: "cardano", symbol: "ADA", name: "Cardano" },
+      { id: "ripple", symbol: "XRP", name: "Ripple" },
+      { id: "dogecoin", symbol: "DOGE", name: "Dogecoin" },
+      { id: "avalanche-2", symbol: "AVAX", name: "Avalanche" },
+      { id: "polkadot", symbol: "DOT", name: "Polkadot" }
     ];
     renderTokenList("");
   }
@@ -141,16 +141,13 @@ function selectToken(id, symbol) {
 
 async function lookupToken(q) {
   try {
-    // Search for cryptocurrency by symbol using CMC API
-    const data = await fetchCryptoData(`cryptocurrency/quotes/latest?symbol=${encodeURIComponent(q.toUpperCase())}`);
+    // Search using CoinGecko - 1 API call
+    const data = await fetchCryptoData(`search?query=${encodeURIComponent(q)}`);
     
-    if (data && data.status && data.status.error_code === 0 && data.data) {
-      const symbol = q.toUpperCase();
-      const cryptoData = data.data[symbol];
-      if (cryptoData) {
-        setSelectedToken(cryptoData.id, symbol);
-        fetchPriceAndData(cryptoData.id);
-      }
+    if (data && data.coins && data.coins.length > 0) {
+      const coin = data.coins[0];
+      setSelectedToken(coin.id, coin.symbol.toUpperCase());
+      fetchPriceAndData(coin.id);
     }
   } catch (err) {
     console.warn("Token lookup failed", err);
@@ -169,93 +166,45 @@ function setStartPrice(v) {
 
 async function fetchPriceAndData(id) {
   try {
-    // Get current price from CoinMarketCap using ID
-    const data = await fetchCryptoData(`cryptocurrency/quotes/latest?id=${id}`);
-    if (data && data.status && data.status.error_code === 0 && data.data && data.data[id]) {
-      const price = data.data[id].quote.USD.price;
-      setStartPrice(parseFloat(price));
+    // Get current price from CoinGecko - 1 API call
+    const data = await fetchCryptoData(`simple/price?ids=${id}&vs_currencies=usd`);
+    if (data && data[id] && data[id].usd) {
+      setStartPrice(parseFloat(data[id].usd));
     }
   } catch (err) {
     console.error("Failed to fetch price", err);
   }
 }
 
-// Fetch historical data from CMC to calculate average returns
+// Fetch historical data from CoinGecko to calculate average returns
 async function fetchHistoricalData(id) {
   try {
     const days = currentPeriod === "max" ? 365 : parseInt(currentPeriod);
     
-    // Calculate start and end dates
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - days);
-    
-    const startISO = start.toISOString();
-    const endISO = end.toISOString();
-    
-    // Try CMC historical quotes endpoint
-    const endpoint = `cryptocurrency/quotes/historical?id=${id}&time_start=${startISO}&time_end=${endISO}&interval=daily`;
-    console.log('Fetching historical data:', endpoint);
-    
-    const data = await fetchCryptoData(endpoint);
+    // Get historical market chart data from CoinGecko - 1 API call
+    const data = await fetchCryptoData(`coins/${id}/market_chart?vs_currency=usd&days=${days}`);
     console.log('Historical data response:', data);
     
-    if (data && data.status && data.status.error_code === 0 && data.data && data.data.quotes) {
-      const quotes = data.data.quotes;
-      const prices = quotes.map(quote => quote.quote.USD.price);
+    if (data && data.prices && Array.isArray(data.prices) && data.prices.length >= 2) {
+      // Extract prices from [timestamp, price] arrays
+      const prices = data.prices.map(pricePoint => pricePoint[1]);
+      console.log('Extracted prices:', prices.length, 'data points');
       
-      console.log('Extracted prices:', prices);
-      
-      if (prices.length >= 2) {
-        // Calculate average daily return from historical prices
-        processHistoricalData(prices);
-        return;
-      }
+      // Calculate average daily return from historical prices
+      processHistoricalData(prices);
+      return;
     }
     
-    console.warn('CMC historical data failed or requires paid plan, using fallback');
-    // Fallback: use recent price changes as proxy
-    await fetchRecentPriceChanges(id);
+    console.warn('CoinGecko historical data insufficient, using fallback');
+    // Ultimate fallback
+    avgDailyReturn = 0.002; // 0.2% daily
+    sigmaDynamic = 0.05;
+    updateHistoricalStats();
     
   } catch (err) {
     console.error("Historical data fetch failed", err);
-    await fetchRecentPriceChanges(id);
-  }
-}
-
-// Fallback: use recent price change percentages as proxy for returns
-async function fetchRecentPriceChanges(id) {
-  try {
-    const data = await fetchCryptoData(`cryptocurrency/quotes/latest?id=${id}`);
-    
-    if (data && data.status && data.status.error_code === 0 && data.data && data.data[id]) {
-      const crypto = data.data[id];
-      const quote = crypto.quote.USD;
-      
-      // Use price change percentages as proxy for returns
-      let dailyChange = 0;
-      
-      if (currentPeriod === "30") {
-        dailyChange = (quote.percent_change_30d || 0) / 30; // 30 day average
-      } else if (currentPeriod === "90") {
-        // Estimate 90 day from 30d and 7d data
-        const change30d = quote.percent_change_30d || 0;
-        const change7d = quote.percent_change_7d || 0;
-        dailyChange = (change30d * 3 + change7d * 4.28) / (90); // Weighted estimate
-      } else {
-        dailyChange = (quote.percent_change_7d || 0) / 7; // 7 day average
-      }
-      
-      avgDailyReturn = dailyChange / 100; // Convert percentage to decimal
-      sigmaDynamic = 0.05; // Minimal volatility since we're just extrapolating
-      
-      updateHistoricalStats();
-      console.log(`Using price change proxy: ${dailyChange.toFixed(3)}% daily return`);
-    }
-  } catch (err) {
-    console.error("Fallback price change fetch failed", err);
     // Ultimate fallback
-    avgDailyReturn = 0.001; // 0.1% daily
+    avgDailyReturn = 0.002;
     sigmaDynamic = 0.05;
     updateHistoricalStats();
   }

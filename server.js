@@ -6,8 +6,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // API key MUST be set as environment variable - no fallbacks
-const API_KEY = process.env.CMC_API_KEY;
-const BASE_URL = 'https://pro-api.coinmarketcap.com/v1';
+const API_KEY = process.env.COINGECKO_API_KEY;
+const BASE_URL = 'https://pro-api.coingecko.com/api/v3';
 
 // Enable CORS
 app.use(cors());
@@ -25,24 +25,20 @@ app.get('/api/proxy', async (req, res) => {
   }
   
   if (!API_KEY) {
-    console.error('CMC_API_KEY environment variable not set');
-    return res.status(500).json({ error: 'API key not configured. Set CMC_API_KEY environment variable.' });
+    console.error('COINGECKO_API_KEY environment variable not set');
+    return res.status(500).json({ error: 'API key not configured. Set COINGECKO_API_KEY environment variable.' });
   }
 
   try {
-    // CoinMarketCap uses headers for API key, not query params
-    const url = `${BASE_URL}/${endpoint}`;
+    // CoinGecko uses API key as query parameter
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const url = `${BASE_URL}/${endpoint}${separator}x_cg_demo_api_key=${API_KEY}`;
     console.log('Full URL being requested:', url);
     console.log('Endpoint received:', endpoint);
     console.log('API key length:', API_KEY ? API_KEY.length : 'undefined');
     
     const fetch = (await import('node-fetch')).default;
-    const response = await fetch(url, {
-      headers: {
-        'X-CMC_PRO_API_KEY': API_KEY,
-        'Accept': 'application/json'
-      }
-    });
+    const response = await fetch(url);
     
     console.log('Response status:', response.status);
     console.log('Response headers:', Object.fromEntries(response.headers));
