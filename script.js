@@ -180,44 +180,24 @@ async function fetchPriceAndData(id) {
   }
 }
 
-// Fetch historical data using CoinMarketCap (requires paid plan)
+// Skip historical data - just use simple linear extrapolation
 async function fetchHistoricalData(id) {
   try {
     // CMC historical data requires paid subscription
-    // For free tier, we'll use reasonable volatility estimates
-    console.log('Using volatility estimates - CMC historical data requires paid plan');
+    // We'll just use linear price extrapolation in the simulation
+    console.log('Skipping historical data - using linear price extrapolation');
     
-    // Get current price to understand the asset better
-    const priceData = await fetchCryptoData(`cryptocurrency/quotes/latest?id=${id}`);
+    // Set minimal values so the simulation works without historical calculations
+    avgDailyReturn = 0;
+    sigmaDynamic = 0;
     
-    let volatilityMultiplier = 1;
-    if (priceData && priceData.status && priceData.status.error_code === 0) {
-      const crypto = priceData.data[id];
-      const marketCap = crypto?.quote?.USD?.market_cap || 0;
-      
-      // Adjust volatility based on market cap
-      if (marketCap > 100000000000) { // > $100B
-        volatilityMultiplier = 0.7; // Lower volatility for large caps
-      } else if (marketCap > 10000000000) { // > $10B  
-        volatilityMultiplier = 1.0; // Medium volatility
-      } else {
-        volatilityMultiplier = 1.5; // Higher volatility for small caps
-      }
-    }
-    
-    // Base estimates adjusted by market cap
-    avgDailyReturn = 0.003 * volatilityMultiplier;
-    sigmaDynamic = 0.06 * volatilityMultiplier;
-    
-    updateHistoricalStats();
-    console.log(`Using volatility estimates: ${(avgDailyReturn * 100).toFixed(3)}% daily return, ${(sigmaDynamic * 100).toFixed(1)}% volatility`);
+    // Don't show historical stats since we're not using them
+    document.getElementById("historicalStats").style.display = "none";
     
   } catch (err) {
     console.error("Historical data fetch failed", err);
-    // Fallback to conservative estimates
-    avgDailyReturn = 0.002;
-    sigmaDynamic = 0.06;
-    updateHistoricalStats();
+    avgDailyReturn = 0;
+    sigmaDynamic = 0;
   }
 }
 
