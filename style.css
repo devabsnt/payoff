@@ -321,4 +321,27 @@ body {
     list-style: none;
     padding-left: 0;
   }
+
+  /* Attribution styling */
+  .attribution {
+    text-align: center;
+    margin-bottom: 2rem;
+    opacity: 0.8;
+  }
+
+  .attribution p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #ccc;
+  }
+
+  .attribution a {
+    color: #0ff;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .attribution a:hover {
+    text-decoration: underline;
+  }
   
