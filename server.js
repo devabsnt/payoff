@@ -55,6 +55,7 @@ app.get('/api/proxy', async (req, res) => {
     }
     
     const data = await response.json();
+    console.log('API Response Body:', JSON.stringify(data, null, 2));
     
     if (!response.ok) {
       return res.status(response.status).json({ error: data.message || 'API request failed' });
