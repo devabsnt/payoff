@@ -79,33 +79,42 @@ function copy(buttonEl) {
 // Fetch top tokens from FreeCryptoAPI
 async function fetchTopTokens() {
   try {
-    // Test with just BTC first to see if the API works
-    const data = await fetchCryptoData(`getData?symbol=BTC`);
-    console.log('API response for BTC:', data);
+    // Test with conversion endpoint first (has clear required params)
+    console.log('Testing API with conversion endpoint...');
+    const testData = await fetchCryptoData(`getConversion?from=BTC&to=USD&amount=1`);
+    console.log('Conversion API test:', testData);
     
-    if (data && typeof data === 'object' && !data.error && data.BTC) {
-      // If BTC works, try multiple symbols
-      const commonSymbols = "BTC+ETH+USDT+BNB+SOL+ADA+XRP+DOGE+AVAX+DOT";
-      const multiData = await fetchCryptoData(`getData?symbol=${commonSymbols}`);
-      console.log('API response for multiple symbols:', multiData);
+    if (testData && !testData.error) {
+      console.log('API is working! Now testing getData...');
       
-      if (multiData && typeof multiData === 'object' && !multiData.error) {
-        topTokens = Object.keys(multiData).map(symbol => ({
-          id: symbol.toLowerCase(),
-          symbol: symbol,
-          name: symbol
-        }));
-        console.log('Processed tokens:', topTokens);
+      // Try getData with BTC
+      const data = await fetchCryptoData(`getData?symbol=BTC`);
+      console.log('getData response:', data);
+      
+      if (data && typeof data === 'object' && !data.error) {
+        // Use fallback tokens but getData should work for prices
+        topTokens = [
+          { id: "btc", symbol: "BTC", name: "Bitcoin" },
+          { id: "eth", symbol: "ETH", name: "Ethereum" },
+          { id: "usdt", symbol: "USDT", name: "Tether" },
+          { id: "bnb", symbol: "BNB", name: "BNB" },
+          { id: "sol", symbol: "SOL", name: "Solana" },
+          { id: "ada", symbol: "ADA", name: "Cardano" },
+          { id: "xrp", symbol: "XRP", name: "Ripple" },
+          { id: "doge", symbol: "DOGE", name: "Dogecoin" },
+          { id: "avax", symbol: "AVAX", name: "Avalanche" },
+          { id: "dot", symbol: "DOT", name: "Polkadot" }
+        ];
+        console.log('Using fallback tokens, but API should work for prices');
         renderTokenList("");
         return;
       }
     }
     
-    // If API calls fail, show error details
-    throw new Error(data?.error || 'API failed or returned invalid data');
+    throw new Error('API test failed: ' + (testData?.error || 'Unknown error'));
     
   } catch (err) {
-    console.error("Failed to load top tokens", err);
+    console.error("API tests failed", err);
     // Always use fallback tokens
     topTokens = [
       { id: "btc", symbol: "BTC", name: "Bitcoin" },
