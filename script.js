@@ -10,8 +10,29 @@ const tokenSearch = document.getElementById("tokenSearch");
 const tokenList   = document.getElementById("tokenList");
 let currentPeriod = "90"; // Default to 3 months
 
-// Helper function for CoinGecko API calls via proxy
+// Helper function for CoinGecko API calls via proxy with localStorage caching
 async function fetchCryptoData(endpoint) {
+  // Check localStorage cache first
+  const cacheKey = `crypto_${endpoint}`;
+  const cachedData = localStorage.getItem(cacheKey);
+  
+  if (cachedData) {
+    try {
+      const parsed = JSON.parse(cachedData);
+      const cacheAge = Date.now() - parsed.timestamp;
+      const maxAge = endpoint.includes('market_chart') ? 10 * 60 * 1000 : 5 * 60 * 1000; // Historical: 10min, Others: 5min
+      
+      if (cacheAge < maxAge) {
+        console.log('Using cached data for:', endpoint);
+        return parsed.data;
+      } else {
+        localStorage.removeItem(cacheKey);
+      }
+    } catch (e) {
+      localStorage.removeItem(cacheKey);
+    }
+  }
+  
   // Use local proxy for development, your domain for production
   const proxyUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? '/api/proxy' 
@@ -20,9 +41,27 @@ async function fetchCryptoData(endpoint) {
   try {
     const response = await fetch(`${proxyUrl}?endpoint=${encodeURIComponent(endpoint)}`);
     if (!response.ok) {
+      if (response.status === 429) {
+        const data = await response.json();
+        throw new Error(`Rate limit exceeded: ${data.error}`);
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    return await response.json();
+    
+    const data = await response.json();
+    
+    // Cache the response in localStorage
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: data,
+        timestamp: Date.now()
+      }));
+      console.log('Cached data to localStorage for:', endpoint);
+    } catch (e) {
+      console.warn('Failed to cache to localStorage:', e);
+    }
+    
+    return data;
   } catch (error) {
     console.error('CoinGecko API error:', error);
     throw error;
